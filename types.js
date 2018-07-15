@@ -25,6 +25,8 @@ var BaseType = function(name, type) {
     this.end_idx = -1;
 };
 
+module.exports.BaseType = BaseType;
+
 // ----------------------------------------------------------
 //                       LITERAL START
 
@@ -35,6 +37,7 @@ var Literal = function(literal_type) {
 
 Literal.prototype = Object.create(BaseType.prototype);
 Literal.prototype.constructor = BaseType;
+module.exports.Literal = Literal;
 
 var Integer = function(num) {
     Literal.call(this, LITERAL_INTEGER);
@@ -53,12 +56,15 @@ var ID = function(id) {
 
 Integer.prototype = Object.create(Literal.prototype);
 Integer.prototype.constructor = Literal;
+module.exports.Integer = Integer;
 
 Boolean.prototype = Object.create(Literal.prototype);
 Boolean.prototype.constructor = Literal;
+module.exports.Boolean = Boolean;
 
 ID.prototype = Object.create(Literal.prototype);
 ID.prototype.constructor = Literal;
+module.exports.ID = ID;
 
 //                       LITERAL END
 // ----------------------------------------------------------
@@ -71,8 +77,9 @@ var Expression = function(expression_type) {
     this.expression_type = expression_type;
 };
 
-Literal.prototype = Object.create(BaseType.prototype);
-Literal.prototype.constructor = BaseType;
+Expression.prototype = Object.create(BaseType.prototype);
+Expression.prototype.constructor = BaseType;
+module.exports.Expression = Expression;
 
 var Parenthesised = function(paren_body) {
     Expression.call(this, PARENTHESISTED_EXPRESSION);
@@ -95,12 +102,15 @@ var RecursiveLet = function(variable, def_func, body) {
 
 Parenthesised.prototype = Object.create(Expression.prototype);
 Parenthesised.prototype.constructor = Expression;
+module.exports.Parenthesised = Parenthesised;
 
 Let.prototype = Object.create(Expression.prototype);
 Let.prototype.constructor = Expression;
+module.exports.Let = Let;
 
 RecursiveLet.prototype = Object.create(Expression.prototype);
 RecursiveLet.prototype.constructor = Expression;
+module.exports.RecursiveLet = RecursiveLet;
 
 //                       EXPRESSIONS END
 // ----------------------------------------------------------
@@ -115,6 +125,7 @@ var Functor = function(function_type) {
 
 Functor.prototype = Object.create(BaseType.prototype);
 Functor.prototype.constructor = BaseType;
+module.exports.Functor = Functor;
 
 var Lambda = function(variable, body) {
     Functor.call(this, LAMBDA);
@@ -149,18 +160,23 @@ var Iter = function(b1, t2, t3) {
 
 Lambda.prototype = Object.create(Functor.prototype);
 Lambda.prototype.constructor = Functor;
+module.exports.Lambda = Lambda;
 
 FunctionApp.prototype = Object.create(Functor.prototype);
 FunctionApp.prototype.constructor = Functor;
+module.exports.FunctionApp = FunctionApp;
 
 Pair.prototype = Object.create(Functor.prototype);
 Pair.prototype.constructor = Functor;
+module.exports.Pair = Pair;
 
 Plus.prototype = Object.create(Functor.prototype);
 Plus.prototype.constructor = Functor;
+module.exports.Plus = Plus;
 
 Iter.prototype = Object.create(Functor.prototype);
 Iter.prototype.constructor = Functor;
+module.exports.Iter = Iter;
 
 //                       FUNCTIONS END
 // ----------------------------------------------------------

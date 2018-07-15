@@ -1,10 +1,12 @@
+types = require('./types')
+
 var BabyMLLexer = function() {
     this.tokens = []
 };
 
 BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
     let paren_num = 1;
-    let start_idx = paren_index;
+    let start_idx = paren_index+1;
     let end_idx = -1;
     for(var i=paren_index+1;i<text.length;i++){
         // Open paren, update start index to i
@@ -16,10 +18,10 @@ BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
             paren_num--;
             // Found the longest closing bracket for now, tokenize it recursive
             if(paren_num == 0) {
-                end_idx = i-1;
+                end_idx = i;
                 // Take body and create paren type
                 const body = text.slice(start_idx, end_idx);
-                paren = new Parenthesised(body);
+                paren = new types.Parenthesised(body);
                 paren.start_idx = start_idx-1;
                 paren.end_idx = end_idx+1;
                 return paren;
@@ -32,8 +34,8 @@ BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
 
 BabyMLLexer.prototype.fun_tokenize = function(text, start_idx) {
     // Read until next space to get the arg
-    const current_arg = ""
-    let j=start_idx+4;
+    let current_arg = ""
+    let j = start_idx+4;
     for(;j<text.length;j++) {
         if(text[j] === ' '){
             break;
@@ -43,7 +45,7 @@ BabyMLLexer.prototype.fun_tokenize = function(text, start_idx) {
     if(text[j+1] == '-' && text[j+2] == '>' && text[j+3] == ' ') {
         // Take the body and create a fun object, recurse on the body
         body = text.slice(j+4);
-        fun = new Lambda(new ID(current_arg), body);
+        fun = new types.Lambda(new types.ID(current_arg), body);
         fun.start_idx = start_idx;
         fun.end = text.length-1;
         fun.children.push(fun.variable);
@@ -78,24 +80,27 @@ BabyMLLexer.prototype.let_tokenize = function(text, space_idx, is_rec){
         let current_txt = "";
         let let_amount = 1;
         for(;i<text.length;i++) {
-            if(current_txt === let_token) {
+            if(current_txt.includes(let_token)) {
                 let_amount++;
                 current_txt = '';
             }
-            else if(current_txt === in_token) {
+            else if(current_txt.includes(in_token)) {
                 let_amount--;
                 if(let_amount == 0) {
                     // Found the right in
                     end_def_func_idx = i-4;
                     const def_func_text = text.slice(start_def_func_idx, end_def_func_idx);
                     const body = text.slice(i);
-                    const let_obj = is_rec ? new RecursiveLet(new ID(id_literal), def_func_text, body) : 
-                                         new Let(new ID(id_literal), def_func_text, body);
+                    const let_obj = is_rec ? new types.RecursiveLet(new types.ID(id_literal), def_func_text, body) : 
+                                         new types.Let(new types.ID(id_literal), def_func_text, body);
                     let_obj.start_idx = start_idx;
                     let_obj.end_idx = text.length-1;
-                    let.children.push(let.variable);
+                    let_obj.children.push(let_obj.variable);
                     return let_obj;
                 }
+            }
+            else {
+                current_txt += text[i];
             }
         }
     }
@@ -113,7 +118,7 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
     let paren_amount = 1;
     let pair_mid_found = false;
     for(;i<text.length;i++) {
-        if(current_txt === ' pair ') {
+        if(current_txt.includes(' pair ')) {
             pair_amount++;
             current_txt = '';
         }
@@ -122,9 +127,11 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
             current_txt = '';
         }
         else if(text[i] === ')') {
+            console.log('a');
             paren_amount--;
             current_txt = '';
             if(paren_amount == 0 && pair_mid_found){
+                console.log('e');
                 // Found end, finish here
                 end_idx = i;
                 let t2_start_idx = -1;
@@ -138,7 +145,7 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
                 }
 
                 const t2 = text.slice(t2_start_idx, end_idx-1);
-                const pair = new Pair(t1, t2);
+                const pair = new types.Pair(t1, t2);
                 pair.start_idx = start_idx;
                 pair.end_idx = end_idx;
                 return pair;
@@ -155,14 +162,18 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
                 // Mid found here, save it
                 mid_idx = i-1;
                 pair_mid_found = true;
+                console.log('d');
             }
+        }
+        else {
+            current_txt += text[i];
         }
     }
 }
 
 BabyMLLexer.prototype.funcapp_tokenize = function(text, func_def, space_idx) {
     const arg = text.slice(space_idx+1);
-    let funcapp = new FunctionApp(func_def, arg);
+    let funcapp = new types.FunctionApp(func_def, arg);
     funcapp.start_idx = space_idx-func_def.length-1;
     funcapp.end_idx = text.length-1;
     return funcapp;
@@ -171,15 +182,15 @@ BabyMLLexer.prototype.funcapp_tokenize = function(text, func_def, space_idx) {
 BabyMLLexer.prototype.literal_tokenize = function(literal, start_idx) {
     let obj = null;
     if(literal === 'true' || literal === 'false') {
-        obj = new Boolean(literal === 'true');
+        obj = new types.Boolean(literal === 'true');
     }
     else {
         let num = parseInt(literal);
         if(!isNaN(num)) {
-            obj = new Number(num);
+            obj = new types.Number(num);
         }
         else {
-            obj = new ID(literal);
+            obj = new types.ID(literal);
         }
     }
 
@@ -194,21 +205,21 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
         if(c === '(') {
             obj = this.paren_tokenize(text, i);
             if(obj == null) {
-                throw new DOMException('Invalid text, paren error');
+                throw new Error('Invalid text, paren error');
             }
             this.tokenize(obj.paren_body, obj);
         }
         else if(current_txt === 'fun' && c === ' ') {
             obj = this.fun_tokenize(text, i-3);
             if(obj == null) {
-                throw new DOMException('Invalid text, fun error');
+                throw new Error('Invalid text, fun error');
             }
             this.tokenize(obj.body, obj);
         }
         else if((current_txt === 'let' || current_txt === 'letrec') && c === ' '){
             obj = this.let_tokenize(text, i, current_txt === 'letrec');
             if(obj == null) {
-                throw new DOMException('Invalid text, let/letrec error');
+                throw new Error('Invalid text, let/letrec error');
             }
             this.tokenize(obj.def_func, obj);
             this.tokenize(obj.body, obj);
@@ -218,7 +229,7 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
             if(current_txt === 'pair') {
                 obj = this.pair_tokenize(text, i);
                 if(obj == null) {
-                    throw new DOMException('Invalid text, pair error');
+                    throw new Error('Invalid text, pair error');
                 }
                 this.tokenize(obj.t1, obj);
                 this.tokenize(obj.t2, obj);
@@ -227,13 +238,13 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
                 if(i+1 == text.length) {
                     obj = this.literal_tokenize(current_txt, i-current_txt.length-1)
                     if(obj == null) {
-                        throw new DOMException('Invalid text, literal error');
+                        throw new Error('Invalid text, literal error');
                     }
                 }
                 else {
                     obj = this.funcapp_tokenize(text, current_txt, i);
                     if(obj == null) {
-                        throw new DOMException('Invalid text, funcapp error');
+                        throw new Error('Invalid text, funcapp error');
                     }
                     this.tokenize(obj.func, obj);
                     this.tokenize(obj.arg, obj);
@@ -259,7 +270,7 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
     if(current_txt != "") {
         obj = this.literal_tokenize(current_txt, text.length-current_txt.length-1)
         if(obj == null) {
-            throw new DOMException('Invalid text, literal error');
+            throw new Error('Invalid text, literal error');
         }
 
         if(parent_object != null) {
@@ -335,7 +346,8 @@ function clickme() {
 }
 
 
-
 const test2 = '(fun g -> let f = fun x -> x in pair (f 3, f true))'
 const test3 = 'let x = fun y -> z y in x 5'
 const test4 = 'plus 5 3'
+
+console.log(new BabyMLLexer().tokenize(test2));
