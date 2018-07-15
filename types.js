@@ -1,6 +1,6 @@
 // Enums
 LITERAL                     = 0
-LITERAL_INTEGER             = 1
+LITERAL_NUMBER              = 1
 LITERAL_BOOLEAN             = 2
 LITERAL_ID                  = 3
 
@@ -39,8 +39,8 @@ Literal.prototype = Object.create(BaseType.prototype);
 Literal.prototype.constructor = BaseType;
 module.exports.Literal = Literal;
 
-var Integer = function(num) {
-    Literal.call(this, LITERAL_INTEGER);
+var Number = function(num) {
+    Literal.call(this, LITERAL_NUMBER);
     this.num = num
 }
 
@@ -54,9 +54,9 @@ var ID = function(id) {
     this.id = id;
 }
 
-Integer.prototype = Object.create(Literal.prototype);
-Integer.prototype.constructor = Literal;
-module.exports.Integer = Integer;
+Number.prototype = Object.create(Literal.prototype);
+Number.prototype.constructor = Literal;
+module.exports.Number = Number;
 
 Boolean.prototype = Object.create(Literal.prototype);
 Boolean.prototype.constructor = Literal;

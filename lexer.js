@@ -8,6 +8,7 @@ BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
     let paren_num = 1;
     let start_idx = paren_index+1;
     let end_idx = -1;
+    console.log(text.slice(paren_index));
     for(var i=paren_index+1;i<text.length;i++){
         // Open paren, update start index to i
         if(text[i] == '(') {
@@ -23,7 +24,7 @@ BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
                 const body = text.slice(start_idx, end_idx);
                 paren = new types.Parenthesised(body);
                 paren.start_idx = start_idx-1;
-                paren.end_idx = end_idx+1;
+                paren.end_idx = end_idx;
                 return paren;
             }
         }
@@ -32,22 +33,23 @@ BabyMLLexer.prototype.paren_tokenize = function(text, paren_index) {
     return null;
 }
 
-BabyMLLexer.prototype.fun_tokenize = function(text, start_idx) {
+BabyMLLexer.prototype.fun_tokenize = function(text, space_idx) {
     // Read until next space to get the arg
     let current_arg = ""
-    let j = start_idx+4;
+    let j = space_idx+1;
     for(;j<text.length;j++) {
         if(text[j] === ' '){
             break;
         }
         current_arg += text[j];
     }
+    
     if(text[j+1] == '-' && text[j+2] == '>' && text[j+3] == ' ') {
         // Take the body and create a fun object, recurse on the body
         body = text.slice(j+4);
         fun = new types.Lambda(new types.ID(current_arg), body);
-        fun.start_idx = start_idx;
-        fun.end = text.length-1;
+        fun.start_idx = space_idx-3;
+        fun.end_idx = text.length-1;
         fun.children.push(fun.variable);
         return fun;
     }
@@ -115,7 +117,7 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
     let i = space_idx+1;
     let current_txt = "";
     let pair_amount = 1;
-    let paren_amount = 1;
+    let paren_amount = 0;
     let pair_mid_found = false;
     for(;i<text.length;i++) {
         if(current_txt.includes(' pair ')) {
@@ -127,15 +129,13 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
             current_txt = '';
         }
         else if(text[i] === ')') {
-            console.log('a');
             paren_amount--;
             current_txt = '';
             if(paren_amount == 0 && pair_mid_found){
-                console.log('e');
                 // Found end, finish here
                 end_idx = i;
                 let t2_start_idx = -1;
-                const t1 = text.slice(start_idx+1, mid_idx-1);
+                const t1 = text.slice(space_idx+2, mid_idx);
                 // Move from mid_idx+1 until something that isnt space is found
                 for(let j=mid_idx+1;j<end_idx;j++) {
                     if(text[j] != ' ') {
@@ -144,10 +144,11 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
                     }
                 }
 
-                const t2 = text.slice(t2_start_idx, end_idx-1);
-                const pair = new types.Pair(t1, t2);
+                const t2 = text.slice(t2_start_idx, end_idx);
+                const pair = new types.Pair(t1.trim(), t2.trim());
                 pair.start_idx = start_idx;
-                pair.end_idx = end_idx;
+                pair.end_idx = end_idx+1;
+                
                 return pair;
             }
             else if(paren_amount == 0) {
@@ -160,9 +161,8 @@ BabyMLLexer.prototype.pair_tokenize = function(text, space_idx) {
             current_txt = '';
             if(pair_amount == 0) {
                 // Mid found here, save it
-                mid_idx = i-1;
+                mid_idx = i;
                 pair_mid_found = true;
-                console.log('d');
             }
         }
         else {
@@ -197,7 +197,7 @@ BabyMLLexer.prototype.literal_tokenize = function(literal, start_idx) {
     return obj;
 }
 
-BabyMLLexer.prototype.tokenize = function(text, parent_object) {
+BabyMLLexer.prototype.tokenize = function(text, parent_object, current_global_index) {
     let current_txt = "";
     let obj = null;
     for(var i=0;i<text.length;i++) {
@@ -207,22 +207,29 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
             if(obj == null) {
                 throw new Error('Invalid text, paren error');
             }
-            this.tokenize(obj.paren_body, obj);
+            this.tokenize(obj.paren_body, obj, current_global_index+1);
         }
         else if(current_txt === 'fun' && c === ' ') {
-            obj = this.fun_tokenize(text, i-3);
+            obj = this.fun_tokenize(text, i);
             if(obj == null) {
                 throw new Error('Invalid text, fun error');
             }
-            this.tokenize(obj.body, obj);
+            this.tokenize(obj.body, obj, current_global_index+9);
         }
         else if((current_txt === 'let' || current_txt === 'letrec') && c === ' '){
-            obj = this.let_tokenize(text, i, current_txt === 'letrec');
+            is_let_rec =  current_txt === 'letrec';
+            obj = this.let_tokenize(text, i, is_let_rec);
             if(obj == null) {
                 throw new Error('Invalid text, let/letrec error');
             }
-            this.tokenize(obj.def_func, obj);
-            this.tokenize(obj.body, obj);
+            const var_len = obj.variable.id.length;
+            const let_len = is_let_rec ? 4 : 7
+            console.log(var_len);
+            console.log(let_len);
+            console.log(obj.def_func.length)
+            console.log(current_global_index + let_len + var_len + 3 + obj.def_func.length + 3);
+            this.tokenize(obj.def_func, obj, current_global_index + let_len + 1 + var_len + 3);
+            this.tokenize(obj.body, obj, current_global_index + let_len + 1 + var_len + 3 + obj.def_func.length + 4);
         }
         else if(c === ' ') {
             // Function app
@@ -231,8 +238,8 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
                 if(obj == null) {
                     throw new Error('Invalid text, pair error');
                 }
-                this.tokenize(obj.t1, obj);
-                this.tokenize(obj.t2, obj);
+                this.tokenize(obj.t1, obj, current_global_index+6);
+                this.tokenize(obj.t2, obj, current_global_index + (obj.end_idx - obj.start_idx)-obj.t2.length-1);
             } else {
                 // Check if there is body
                 if(i+1 == text.length) {
@@ -246,8 +253,8 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
                     if(obj == null) {
                         throw new Error('Invalid text, funcapp error');
                     }
-                    this.tokenize(obj.func, obj);
-                    this.tokenize(obj.arg, obj);
+                    this.tokenize(obj.func, obj, current_global_index);
+                    this.tokenize(obj.arg, obj, current_global_index + obj.func.length + 1);
                 }
             }
         }
@@ -256,6 +263,8 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object) {
             continue;
         }
 
+        obj.start_idx += current_global_index;
+        obj.end_idx += current_global_index;
         if(parent_object != null) {
             parent_object.children.push(obj);
         }
@@ -350,4 +359,8 @@ const test2 = '(fun g -> let f = fun x -> x in pair (f 3, f true))'
 const test3 = 'let x = fun y -> z y in x 5'
 const test4 = 'plus 5 3'
 
-console.log(new BabyMLLexer().tokenize(test2));
+console.log(test2.length);
+console.log('pair (f 3, f true)'.length)
+babyml = new BabyMLLexer();
+babyml.tokenize(test2, null, 0);
+console.log(JSON.stringify(babyml.tokens, null, 4));
