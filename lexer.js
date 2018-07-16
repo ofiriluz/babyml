@@ -203,6 +203,8 @@ BabyMLLexer.prototype.literal_tokenize = function(literal, start_idx) {
 }
 
 BabyMLLexer.prototype.tokenize = function(text, parent_object, current_global_index) {
+    // Clear old tokens
+    this.tokens = [];
     let current_txt = "";
     let obj = null;
     for(var i=0;i<text.length;i++) {
@@ -293,21 +295,6 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object, current_global_in
     }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // IDLiteral: sex, (sex) ...
 // BooleanLiteral: true, (false)
 // IntLiteral: 5, (5)
@@ -347,7 +334,6 @@ BabyMLLexer.prototype.tokenize = function(text, parent_object, current_global_in
 //     - Read body and parse recursive
 //       - If no body, this is a literal, parse either integer or boolean or id 
 
-// const test = 'let x = 7 in (fun kill -> (plus 2 5)) x'
 function clickme() {
     text = document.getElementById("text_to_parse").value;
     console.log(text);
@@ -357,18 +343,35 @@ function clickme() {
 }
 
 var print_indices = function(tokens, text) {
-    for(var i=0;i<tokens.length;i++){
-        console.log(tokens[i].start_idx + "-" + tokens[i].end_idx + "-" + text.slice(tokens[i].start_idx, tokens[i].end_idx));
-        print_indices(tokens[i].children, text);
-    }
+    tokens.forEach(token => {
+        console.log(token.start_idx + "-" + token.end_idx + "-" + text.slice(token.start_idx, token.end_idx));
+        print_indices(token.children, text);
+    });
 }
 
+var assert_indices = function(tokens, text) {
+    tokens.forEach(token => {
+        // Simply check that the start and end idx are logical
+        if(token.start_idx < 0 || token.end_idx > text.length) {
+            console.log(token);
+            throw Error('Invalid token indices');
+        }
+        assert_indices(token.children, text);
+    });
+}
 
-const test2 = '(fun g -> let f = fun x -> x in pair (f 3, f true))'
-const test3 = 'let x = fun y -> z y in x 5'
-const test4 = 'plus 5 3'
+const tests = [
+    'plus 5 3',
+    'pair (f 2, f true)',
+    'pair (f 5,f true)',
+    'let x = fun y -> z y in x 5',
+    '(fun g -> let f = fun x -> x in pair (f 3,f true))'
+]
 
 babyml = new BabyMLLexer();
-babyml.tokenize(test2, null, 0);
-console.log(JSON.stringify(babyml.tokens, null, 4));
-print_indices(babyml.tokens, test2);
+tests.forEach(testcase => {
+    babyml.tokenize(testcase, null, 0);
+    console.log(JSON.stringify(babyml.tokens, null, 4));
+    print_indices(babyml.tokens, testcase);
+    assert_indices(babyml.tokens, testcase);
+})
